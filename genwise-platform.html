@@ -665,7 +665,7 @@ function paintRes(cat, data){
    PAGE: GAMES
    ============================================================ */
 const GAMES = [
-  {id:"classifier", e:"🎯", t:"Train the Classifier", d:"Separate two groups of points — learn supervised classification.", badge:"classifier"},
+  {id:"econ",       e:"📈", t:"AI Economics Quiz",    d:"Test what we learned about AI, jobs, automation, value & cost.", badge:"economist"},
   {id:"spotai",     e:"🕵️", t:"Spot the AI",          d:"Real or AI-generated? Sharpen your Gen-AI literacy.",          badge:"spotter"},
   {id:"promptgolf", e:"⛳",  t:"Prompt Golf",           d:"Write the shortest prompt that hits the target — clear, concise instructions.", badge:"promptpro"},
   {id:"dtree",      e:"🌳", t:"20 Questions Tree",     d:"Watch a decision tree guess your animal.",                    badge:"treethinker"},
@@ -690,36 +690,43 @@ function renderGames(){
 function stage(html){ const s=$("#gameStage"); s.innerHTML=`<div class="card">${html}</div>`; return s; }
 
 const GAME_LAUNCH = {
-  /* ---- Train the Classifier ---- */
-  classifier(g){
-    stage(`<h3 style="margin-top:0;color:var(--ink)">🎯 Train the Classifier</h3>
-      <p class="small muted">Blue 🔵 and orange 🟠 points belong to two classes. Move the line so it separates them. Reach 90%+ to win — that's exactly what a linear classifier learns to do.</p>
-      <canvas id="clf" width="420" height="320"></canvas>
-      <div class="row wrap" style="margin-top:12px;">
-        <label class="small">Slope <input type="range" id="clfA" min="-3" max="3" step="0.05" value="0.5" style="width:160px;"></label>
-        <label class="small">Offset <input type="range" id="clfB" min="-160" max="160" step="2" value="0" style="width:160px;"></label>
-        <span class="pill" id="clfAcc" style="background:#eef4f9;color:var(--ink)">Accuracy: —</span>
-        <button class="btn ghost small" id="clfNew">New points</button>
-      </div>`);
-    const cv=$("#clf"), ctx=cv.getContext("2d"); let pts=[];
-    const gen=()=>{ pts=[]; for(let i=0;i<40;i++){ const x=Math.random()*420, y=Math.random()*320;
-      const cls=(y < 0.6*x+40+ (Math.random()*70-35))?0:1; pts.push({x,y,cls}); } draw(); };
-    const draw=()=>{
-      const a=+$("#clfA").value, b=+$("#clfB").value;
-      ctx.clearRect(0,0,420,320);
-      // line: y = a*x + (160+b)
-      ctx.strokeStyle="#15324a"; ctx.lineWidth=3; ctx.beginPath();
-      const y0=a*0+(160+b), y1=a*420+(160+b); ctx.moveTo(0,y0); ctx.lineTo(420,y1); ctx.stroke();
-      let correct=0;
-      pts.forEach(p=>{ const pred=(p.y < a*p.x+(160+b))?0:1; if(pred===p.cls) correct++;
-        ctx.beginPath(); ctx.arc(p.x,p.y,6,0,7); ctx.fillStyle=p.cls===0?"#1d75c9":"#f6861f"; ctx.fill();
-        ctx.lineWidth=2; ctx.strokeStyle="#fff"; ctx.stroke(); });
-      const acc=Math.round(correct/pts.length*100);
-      const badge=$("#clfAcc"); badge.textContent="Accuracy: "+acc+"%";
-      badge.style.background=acc>=90?"#22a06b22":"#eef4f9"; badge.style.color=acc>=90?"#22a06b":"#15324a";
-      if(acc>=90){ awardBadge("classifier"); markLesson("game-classifier"); }
+  /* ---- AI Economics Quiz (ties to our AI-economics textbook work) ---- */
+  econ(g){
+    const qs=[
+      {q:"In economics, what does it usually mean when a task gets 'automated' by AI?",
+       opts:["The task becomes impossible","A machine/AI does it instead of a person","The task is made illegal","Nobody needs that task anymore"], a:1},
+      {q:"Why has the COST of using AI models generally been falling?",
+       opts:["Governments banned charging for it","Better hardware & efficiency keep cutting the price per task","Fewer people use AI now","AI stopped improving"], a:1},
+      {q:"When AI automates part of a job, a common economic outcome is that workers…",
+       opts:["All become unemployed forever","Often shift to new tasks AI can't do well","Get paid in AI tokens","Stop being needed in any field"], a:1},
+      {q:"'Productivity' roughly means…",
+       opts:["How many hours you work","How much output you get per unit of input","How expensive something is","How many people a company hires"], a:1},
+      {q:"Why might two people get very different VALUE from the same AI tool?",
+       opts:["The tool secretly charges them differently","It depends on how well they use it and what they apply it to","Value is fixed and always equal","Only the first user gets value"], a:1},
+    ];
+    let i=0, score=0;
+    const show=()=>{
+      if(i>=qs.length){
+        stage(`<h3 style="margin-top:0;color:var(--ink)">📈 AI Economics Quiz — done!</h3>
+          <p>You scored <b>${score}/${qs.length}</b>. ${score>=4?"Sharp economist! 🏅":"Revisit our AI-economics notes and try again."}</p>
+          <button class="btn" id="ecAgain">Play again</button>`);
+        $("#ecAgain").onclick=()=>GAME_LAUNCH.econ(g);
+        if(score>=4){ awardBadge("economist"); markLesson("game-econ"); }
+        return;
+      }
+      const it=qs[i];
+      stage(`<h3 style="margin-top:0;color:var(--ink)">📈 AI Economics Quiz <span class="muted small">(${i+1}/${qs.length})</span></h3>
+        <p style="font-size:16px;font-weight:700;">${esc(it.q)}</p>
+        <div class="grid" id="ecOpts" style="gap:8px;"></div>`);
+      const host=$("#ecOpts");
+      const shuffled=it.opts.map((o,idx)=>({o,correct:idx===it.a})).sort(()=>Math.random()-0.5);
+      shuffled.forEach(opt=>{
+        const b=document.createElement("button"); b.className="btn ghost"; b.style.textAlign="left"; b.textContent=opt.o;
+        b.onclick=()=>{ if(opt.correct){ score++; toast("Correct! ✅"); } else toast("Not quite ❌"); i++; show(); };
+        host.appendChild(b);
+      });
     };
-    $("#clfA").oninput=draw; $("#clfB").oninput=draw; $("#clfNew").onclick=gen; gen();
+    show();
   },
 
   /* ---- Spot the AI ---- */
@@ -1011,14 +1018,14 @@ function renderAnnounce(){
    ============================================================ */
 const LESSONS=[
   {id:"lesson-ml-basics", t:"Understand supervised learning"},
-  {id:"game-classifier",  t:"Train a classifier (game)"},
+  {id:"game-econ",        t:"Ace the AI Economics quiz"},
   {id:"lesson-nn",        t:"Understand neural networks"},
   {id:"game-spotai",      t:"Pass 'Spot the AI'"},
   {id:"game-promptgolf",  t:"Finish Prompt Golf"},
   {id:"used-ai-tutor",    t:"Ask the AI tutor a question"},
 ];
 const BADGE_MAP={
-  classifier:{e:"🎯", t:"First Classifier Trained", d:"Separated the two classes at 90%+ accuracy."},
+  economist:{e:"📈", t:"AI Economist", d:"Scored 4/5+ on the AI Economics quiz."},
   spotter:{e:"🕵️", t:"AI Spotter", d:"Scored top marks telling AI from human."},
   promptpro:{e:"⛳", t:"Prompt Pro", d:"Hit every Prompt Golf target with clear prompts."},
   treethinker:{e:"🌳", t:"Tree Thinker", d:"Walked a decision tree to its answer."},
