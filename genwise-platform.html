@@ -582,36 +582,65 @@ function renderResources(){
   content.innerHTML=`
     <div class="page active">
       <h2>Resources 📚</h2>
-      <p class="lead">Curated links for the course. ${isTeacher()?"You can add or remove links — they sync to everyone.":"Your teacher curates these."}</p>
+      <p class="lead">Shared links for the camp. Anyone can suggest one — ${isTeacher()?"you approve student suggestions before they go live.":"your teachers approve student suggestions before they appear here."}</p>
       <div class="sec-title">Week 1 · ML foundations</div>
       <div id="res-week1"></div>
       <div class="sec-title">Week 2 · Going deeper</div>
       <div id="res-week2"></div>
-      ${isTeacher()?`<div class="card" style="margin-top:18px;">
-        <div class="sec-title" style="margin-top:0;">Add a resource</div>
+      ${isTeacher()?`<div class="sec-title">⏳ Pending review</div><div id="res-pending"></div>`:""}
+      <div class="card" style="margin-top:18px;">
+        <div class="sec-title" style="margin-top:0;">Suggest a resource</div>
         <div class="field"><input id="r-title" placeholder="Title"></div>
         <div class="field"><input id="r-url" placeholder="https://…"></div>
         <div class="field"><input id="r-note" placeholder="Short note (optional)"></div>
         <div class="row">
           <select id="r-cat" style="max-width:200px;"><option value="week1">Week 1 (ML foundations)</option><option value="week2">Week 2 (Going deeper)</option></select>
-          <button class="btn" id="r-add">Add link</button>
+          <button class="btn" id="r-add">${isTeacher()?"Add link":"Suggest"}</button>
         </div>
-      </div>`:""}
+        ${isTeacher()?"":'<div class="small muted" style="margin-top:8px;">Your suggestion is sent to your teachers for approval. 👍</div>'}
+      </div>
     </div>`;
-  // seed once if empty
+  // seed once if empty — push each item so they're stored as keyed maps (arrays drop pushed keys in JSON)
   sub(roomBase+"/resources", v=>{
-    if(v==null){ DB.set(roomBase+"/resources", SEED_RESOURCES); return; }
+    if(v==null){ ["week1","week2"].forEach(cat=> SEED_RESOURCES[cat].forEach(item=> DB.push(roomBase+"/resources/"+cat, item))); return; }
     paintRes("week1", v.week1); paintRes("week2", v.week2);
   });
-  if(isTeacher()){
-    $("#r-add").onclick=()=>{
-      const title=$("#r-title").value.trim(), url=$("#r-url").value.trim(), note=$("#r-note").value.trim(), cat=$("#r-cat").value;
-      if(!title||!url) return toast("Need a title and URL");
+  if(isTeacher()) sub(roomBase+"/pending", v=>paintPending(v));
+
+  $("#r-add").onclick=()=>{
+    const title=$("#r-title").value.trim(), url=$("#r-url").value.trim(), note=$("#r-note").value.trim(), cat=$("#r-cat").value;
+    if(!title||!url) return toast("Need a title and URL");
+    if(isTeacher()){
       DB.push(roomBase+"/resources/"+cat, {title,url,note});
-      $("#r-title").value=$("#r-url").value=$("#r-note").value="";
       toast("Resource added");
+    } else {
+      DB.push(roomBase+"/pending", {title,url,note,cat,by:me.uid,byName:me.name,t:DB.now()});
+      toast("Sent to teachers for approval ✅");
+    }
+    $("#r-title").value=$("#r-url").value=$("#r-note").value="";
+  };
+}
+function paintPending(v){
+  const host=$("#res-pending"); if(!host) return;
+  const list=toMap(v).sort((a,b)=>(a.t||0)-(b.t||0));
+  if(!list.length){ host.innerHTML='<div class="empty">No suggestions waiting.</div>'; return; }
+  host.innerHTML="";
+  list.forEach(p=>{
+    const el=document.createElement("div"); el.className="item"; el.style.borderLeft="4px solid var(--brand)";
+    el.innerHTML=`<div class="row"><div>
+        <div class="t"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)} ↗</a></div>
+        <div class="d">${esc(p.note||p.url)}</div>
+        <div class="small muted" style="margin-top:3px;">Suggested by ${esc(p.byName||"a student")} · ${p.cat==="week2"?"Week 2":"Week 1"}</div></div>
+        <div class="right" style="display:flex;gap:6px;">
+          <button class="btn small" data-ok="${p._k}">Approve</button>
+          <button class="btn ghost small" data-no="${p._k}">Reject</button></div></div>`;
+    el.querySelector("[data-ok]").onclick=()=>{
+      DB.push(roomBase+"/resources/"+(p.cat||"week1"), {title:p.title,url:p.url,note:p.note});
+      DB.remove(roomBase+"/pending/"+p._k); toast("Approved & published");
     };
-  }
+    el.querySelector("[data-no]").onclick=()=>{ DB.remove(roomBase+"/pending/"+p._k); toast("Rejected"); };
+    host.appendChild(el);
+  });
 }
 function paintRes(cat, data){
   const host=$("#res-"+cat); if(!host) return;
@@ -989,13 +1018,13 @@ const LESSONS=[
   {id:"used-ai-tutor",    t:"Ask the AI tutor a question"},
 ];
 const BADGE_MAP={
-  classifier:{e:"🎯", t:"First Classifier Trained"},
-  spotter:{e:"🕵️", t:"AI Spotter"},
-  promptpro:{e:"⛳", t:"Prompt Pro"},
-  treethinker:{e:"🌳", t:"Tree Thinker"},
-  starter:{e:"🚀", t:"Got Started"},
-  scholar:{e:"🎓", t:"Half-way Scholar"},
-  champ:{e:"🏆", t:"Camp Champion"},
+  classifier:{e:"🎯", t:"First Classifier Trained", d:"Separated the two classes at 90%+ accuracy."},
+  spotter:{e:"🕵️", t:"AI Spotter", d:"Scored top marks telling AI from human."},
+  promptpro:{e:"⛳", t:"Prompt Pro", d:"Hit every Prompt Golf target with clear prompts."},
+  treethinker:{e:"🌳", t:"Tree Thinker", d:"Walked a decision tree to its answer."},
+  starter:{e:"🚀", t:"Got Started", d:"Completed your first learning step."},
+  scholar:{e:"🎓", t:"Half-way Scholar", d:"Finished half of the camp checklist."},
+  champ:{e:"🏆", t:"Camp Champion", d:"Completed every item on the checklist."},
 };
 function awardBadge(id){
   DB.update(roomBase+"/progress/"+me.uid+"/badges", { [id]: true });
@@ -1038,7 +1067,8 @@ function renderProgress(){
     Object.entries(BADGE_MAP).forEach(([id,b])=>{
       const got=badges[id];
       const c=document.createElement("div"); c.className="card badgecard"+(got?"":" locked");
-      c.innerHTML=`<div class="be">${b.e}</div><div class="small" style="font-weight:700;margin-top:4px;">${b.t}</div>`;
+      c.innerHTML=`<div class="be">${b.e}</div><div class="small" style="font-weight:700;margin-top:4px;">${b.t}</div>
+        <div class="small muted" style="margin-top:3px;line-height:1.35;">${b.d}</div>`;
       bb.appendChild(c);
     });
   });
