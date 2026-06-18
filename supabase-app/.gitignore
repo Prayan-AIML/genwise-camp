@@ -1,0 +1,8 @@
+# Vite / Node
+node_modules
+dist
+
+# Secrets — real values live here, NEVER commit this
+.env
+.env.local
+.env.*.local
