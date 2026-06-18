@@ -17,7 +17,7 @@ To join: open the link → enter the room code → tap your name/seat → pick a
 ## 👥 Who it's for
 
 - **Teachers:** Mr. Keshav, Mr. Ashish
-- **Students:** Prayan, Aarav, Akshaan, Parnika, Sohum, Kiyaan, Jesna
+- **Students:** Prayan, Aarav, Akshaan, Parnika, Sohum, Kiyaan, Leysha
 
 ---
 
