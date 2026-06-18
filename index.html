@@ -466,6 +466,8 @@ function navigate(id){
 /* ---------- helpers ---------- */
 const content = $("#content");
 function esc(s){ return (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function fmtSize(b){ b=+b||0; return b<1024?b+" B":b<1048576?(b/1024).toFixed(0)+" KB":(b/1048576).toFixed(1)+" MB"; }
+function readAsDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error); r.readAsDataURL(file); }); }
 function fmtTime(t){ if(!t) return ""; const d=new Date(t);
   return d.toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}); }
 function toMap(obj){ return obj ? Object.entries(obj).map(([k,v])=>({_k:k,...v})) : []; }
@@ -592,8 +594,9 @@ function renderResources(){
       <div class="card" style="margin-top:18px;">
         <div class="sec-title" style="margin-top:0;">Suggest a resource</div>
         <div class="field"><input id="r-title" placeholder="Title"></div>
-        <div class="field"><input id="r-url" placeholder="https://…"></div>
+        <div class="field"><input id="r-url" placeholder="https://…  (or attach a file below)"></div>
         <div class="field"><input id="r-note" placeholder="Short note (optional)"></div>
+        <div class="field"><input id="r-file" type="file"><div class="small muted" style="margin-top:4px;">Optional — attach a file instead of (or as well as) a link. Max 600&nbsp;KB.</div></div>
         <div class="row">
           <select id="r-cat" style="max-width:200px;"><option value="week1">Week 1 (ML foundations)</option><option value="week2">Week 2 (Going deeper)</option></select>
           <button class="btn" id="r-add">${isTeacher()?"Add link":"Suggest"}</button>
@@ -608,17 +611,29 @@ function renderResources(){
   });
   if(isTeacher()) sub(roomBase+"/pending", v=>paintPending(v));
 
-  $("#r-add").onclick=()=>{
+  $("#r-add").onclick=async ()=>{
     const title=$("#r-title").value.trim(), url=$("#r-url").value.trim(), note=$("#r-note").value.trim(), cat=$("#r-cat").value;
-    if(!title||!url) return toast("Need a title and URL");
+    const fileInput=$("#r-file"); const file=fileInput&&fileInput.files[0];
+    if(!title) return toast("Need a title");
+    if(!url && !file) return toast("Add a URL or attach a file");
+    const btn=$("#r-add"); btn.disabled=true;
+    let fileObj=null;
+    if(file){
+      const MAX=600*1024;
+      if(file.size>MAX){ btn.disabled=false; return toast("File too big — max 600 KB"); }
+      try{ const data=await readAsDataURL(file); fileObj={name:file.name, type:file.type||"", size:file.size, data}; }
+      catch(e){ btn.disabled=false; return toast("Couldn't read that file"); }
+    }
+    const item={title,url,note}; if(fileObj) item.file=fileObj;
     if(isTeacher()){
-      DB.push(roomBase+"/resources/"+cat, {title,url,note});
+      DB.push(roomBase+"/resources/"+cat, item);
       toast("Resource added");
     } else {
-      DB.push(roomBase+"/pending", {title,url,note,cat,by:me.uid,byName:me.name,t:DB.now()});
+      DB.push(roomBase+"/pending", {...item,cat,by:me.uid,byName:me.name,t:DB.now()});
       toast("Sent to teachers for approval ✅");
     }
-    $("#r-title").value=$("#r-url").value=$("#r-note").value="";
+    $("#r-title").value=$("#r-url").value=$("#r-note").value=""; if(fileInput) fileInput.value="";
+    btn.disabled=false;
   };
 }
 function paintPending(v){
@@ -630,13 +645,14 @@ function paintPending(v){
     const el=document.createElement("div"); el.className="item"; el.style.borderLeft="4px solid var(--brand)";
     el.innerHTML=`<div class="row"><div>
         <div class="t"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)} ↗</a></div>
-        <div class="d">${esc(p.note||p.url)}</div>
+        <div class="d">${esc(p.note||p.url||"")}${p.file?` · 📎 ${esc(p.file.name||"file")}`:""}</div>
         <div class="small muted" style="margin-top:3px;">Suggested by ${esc(p.byName||"a student")} · ${p.cat==="week2"?"Week 2":"Week 1"}</div></div>
         <div class="right" style="display:flex;gap:6px;">
           <button class="btn small" data-ok="${p._k}">Approve</button>
           <button class="btn ghost small" data-no="${p._k}">Reject</button></div></div>`;
     el.querySelector("[data-ok]").onclick=()=>{
-      DB.push(roomBase+"/resources/"+(p.cat||"week1"), {title:p.title,url:p.url,note:p.note});
+      const item={title:p.title,url:p.url,note:p.note}; if(p.file) item.file=p.file;
+      DB.push(roomBase+"/resources/"+(p.cat||"week1"), item);
       DB.remove(roomBase+"/pending/"+p._k); toast("Approved & published");
     };
     el.querySelector("[data-no]").onclick=()=>{ DB.remove(roomBase+"/pending/"+p._k); toast("Rejected"); };
@@ -651,9 +667,14 @@ function paintRes(cat, data){
   host.innerHTML="";
   list.forEach(r=>{
     const el=document.createElement("div"); el.className="item";
+    const hasFile = r.file && r.file.data;
+    const titleHref = r.url ? esc(r.url) : (hasFile ? r.file.data : "#");
+    const titleAttrs = r.url ? 'target="_blank" rel="noopener"' : (hasFile ? `download="${esc(r.file.name||"file")}"` : "");
+    const fileLine = hasFile ? `<div class="d">📎 <a href="${r.file.data}" download="${esc(r.file.name||"file")}">${esc(r.file.name||"Download file")}</a> <span class="small muted">(${fmtSize(r.file.size)})</span></div>` : "";
     el.innerHTML=`<div class="row"><div>
-        <div class="t"><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)} ↗</a></div>
-        <div class="d">${esc(r.note||r.url)}</div></div>
+        <div class="t"><a href="${titleHref}" ${titleAttrs}>${esc(r.title)} ↗</a></div>
+        ${r.note?`<div class="d">${esc(r.note)}</div>`:(r.url?`<div class="d">${esc(r.url)}</div>`:"")}
+        ${fileLine}</div>
         ${isTeacher()&&!Array.isArray(data)?`<button class="btn ghost small right" data-k="${r._k}">Remove</button>`:""}
       </div>`;
     const rm=el.querySelector("button");
