@@ -4,9 +4,16 @@ firebase-debug.log
 
 # Standalone side-projects — kept locally, not published to the public repo
 ai-economics-hq.html
+ai-economics-hq 2.html
 chat.html
+chat 2.html
 chat.py
+chat 2.py
 college-finder.html
+college-finder 2.html
 crystallization-from-hcl.html
+crystallization-from-hcl 2.html
 html-to-markdown-converter.html
+html-to-markdown-converter 2.html
 recap-cli-json.html
+recap-cli-json 2.html

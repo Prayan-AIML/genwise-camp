@@ -301,26 +301,39 @@ const FIREBASE_CONFIG = {
    ------------------------------------------------------------
    Values live in  supabase-app/.env  (gitignored), as:
      VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY,
-     VITE_SUPABASE_BUCKET, VITE_APP_SLUG
+     VITE_SUPABASE_STORAGE_BUCKET, VITE_APP_SLUG
    Vite injects them here at build time via import.meta.env.
    (Reminder: VITE_ values still ship to the browser — the anon
     key is public-safe; never put the service_role key in .env.)
    ============================================================ */
-const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const SUPABASE_BUCKET   = import.meta.env.VITE_SUPABASE_BUCKET;
-const APP_SLUG          = import.meta.env.VITE_APP_SLUG;
+const ENV = import.meta.env || {};
+const SUPABASE_URL      = ENV.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = ENV.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_BUCKET   = ENV.VITE_SUPABASE_STORAGE_BUCKET || ENV.VITE_SUPABASE_BUCKET;
+const APP_SLUG          = ENV.VITE_APP_SLUG;
 
 const LIVE = !!FIREBASE_CONFIG.databaseURL;
 
 /* ============================================================
    1c) SUPABASE CONNECTION TEST
    ------------------------------------------------------------
-   On load this tries to connect to Supabase using the 3 values above
-   and read the table. It shows a banner at the bottom and logs the
-   data to the browser console (press F12 → Console to see it).
+   On load this tries to connect to Supabase using the values above
+   and read your Storage folder. It shows a banner at the bottom and
+   logs the files to the browser console (press F12 → Console to see it).
    This is the whole point of this fork: prove the connection works.
    ============================================================ */
+let supabaseClient = null;
+async function getSupabaseClient(){
+  if(supabaseClient) return supabaseClient;
+  if(!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_BUCKET || !APP_SLUG){
+    throw new Error("Supabase is not configured. Check your .env file.");
+  }
+  const { createClient } = await import("@supabase/supabase-js");
+  supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  window.supabase = supabaseClient;
+  return supabaseClient;
+}
+
 (async function connectSupabase(){
   const banner = document.createElement("div");
   banner.id = "sb-banner";
@@ -338,16 +351,16 @@ const LIVE = !!FIREBASE_CONFIG.databaseURL;
   }
   try{
     show("⏳ Connecting to Supabase Storage…", "#6b7280");
-    const { createClient } = await import("@supabase/supabase-js");
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    window.supabase = supabase;   // lets you poke at it from the console
-    const { data, error } = await supabase.storage.from(SUPABASE_BUCKET).list(APP_SLUG, { limit: 100 });
-    if(error) throw error;
-    const n = (data||[]).length;
-    show(`✅ Connected to Supabase Storage! Bucket <b>${SUPABASE_BUCKET}</b> / folder <b>${APP_SLUG}</b> `
-       + `has <b>${n}</b> file(s). (Open the console to see them.)`, "#15803d");
-    console.log(`[Supabase] ✅ Connected — ${n} file(s) in "${SUPABASE_BUCKET}/${APP_SLUG}":`);
-    console.table(data);
+    const supabase = await getSupabaseClient();
+    const [{ data: files, error: fileError }, { data: rows, error: rowError }] = await Promise.all([
+      supabase.storage.from(SUPABASE_BUCKET).list(APP_SLUG, { limit: 100 }),
+      supabase.from("resources").select("id").eq("app_slug", APP_SLUG).limit(1000)
+    ]);
+    if(fileError) throw fileError;
+    if(rowError) throw rowError;
+    show(`✅ Connected to Supabase! <b>${rows?.length||0}</b> resource row(s), `
+       + `<b>${files?.length||0}</b> file(s) in <b>${SUPABASE_BUCKET}/${APP_SLUG}</b>.`, "#15803d");
+    console.log(`[Supabase] ✅ Connected — resources table + "${SUPABASE_BUCKET}/${APP_SLUG}" storage folder are ready.`);
   }catch(e){
     show(`❌ Supabase connection failed: ${e.message||e}. `
        + `Check the URL, anon key, bucket name, and that the bucket allows access (policies).`, "#b91c1c");
@@ -514,7 +527,90 @@ function navigate(id){
 const content = $("#content");
 function esc(s){ return (s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function fmtSize(b){ b=+b||0; return b<1024?b+" B":b<1048576?(b/1024).toFixed(0)+" KB":(b/1048576).toFixed(1)+" MB"; }
-function readAsDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error); r.readAsDataURL(file); }); }
+function safeFileName(name){
+  return (name||"file").replace(/[^a-z0-9._-]+/gi,"-").replace(/^-+|-+$/g,"").slice(0,90) || "file";
+}
+function resourceFilePath(file){
+  const id = Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8);
+  return `${APP_SLUG}/${id}-${safeFileName(file.name)}`;
+}
+async function uploadResourceFile(file){
+  const supabase = await getSupabaseClient();
+  const path = resourceFilePath(file);
+  const { error } = await supabase.storage.from(SUPABASE_BUCKET).upload(path, file, {
+    contentType: file.type || "application/octet-stream",
+    upsert: false
+  });
+  if(error) throw error;
+  return { name:file.name, type:file.type||"", size:file.size, bucket:SUPABASE_BUCKET, path };
+}
+async function getResourceFileUrl(file){
+  if(file?.data) return file.data; // supports old local test files if any exist
+  if(!file?.path) return "#";
+  const supabase = await getSupabaseClient();
+  return supabase.storage.from(file.bucket||SUPABASE_BUCKET).getPublicUrl(file.path).data.publicUrl;
+}
+async function attachFileDownload(link, file){
+  try{
+    link.href = await getResourceFileUrl(file);
+    link.target = "_blank";
+    link.rel = "noopener";
+  }catch(e){
+    link.href = "#";
+    link.onclick = (ev)=>{ ev.preventDefault(); toast("Couldn't open that file"); };
+  }
+}
+function resourceFromSupabaseRow(row){
+  return {
+    _k: row.id,
+    title: row.title,
+    url: row.link_url || "",
+    note: row.description || row.content_text || "",
+    type: row.resource_type || "link",
+    author: row.author_name || "",
+    createdAt: row.created_at,
+    appSlug: row.app_slug,
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    file: row.storage_path ? {
+      name: row.file_name || "Download file",
+      type: row.file_mime_type || "",
+      size: row.file_size_bytes || 0,
+      bucket: row.storage_bucket || SUPABASE_BUCKET,
+      path: row.storage_path
+    } : null
+  };
+}
+async function loadSupabaseResources(){
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from("resources")
+    .select("*")
+    .order("created_at", { ascending:false });
+  if(error) throw error;
+  return (data||[]).map(resourceFromSupabaseRow);
+}
+async function saveSupabaseResource({ title, url, note, cat, fileObj }){
+  const supabase = await getSupabaseClient();
+  const resourceType = fileObj ? "file" : (url ? "link" : "text");
+  const row = {
+    app_slug: APP_SLUG,
+    title,
+    description: note || null,
+    resource_type: resourceType,
+    content_text: (!url && !fileObj) ? note : null,
+    link_url: url || null,
+    storage_bucket: fileObj ? (fileObj.bucket || SUPABASE_BUCKET) : null,
+    storage_path: fileObj ? fileObj.path : null,
+    file_name: fileObj ? fileObj.name : null,
+    file_mime_type: fileObj ? fileObj.type : null,
+    file_size_bytes: fileObj ? fileObj.size : null,
+    author_name: me?.name || "Prayan",
+    tags: [cat],
+    metadata: { source:"genwise-supabase-app" }
+  };
+  const { error } = await supabase.from("resources").insert(row);
+  if(error) throw error;
+}
 function fmtTime(t){ if(!t) return ""; const d=new Date(t);
   return d.toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}); }
 function toMap(obj){ return obj ? Object.entries(obj).map(([k,v])=>({_k:k,...v})) : []; }
@@ -632,100 +728,90 @@ function renderResources(){
   content.innerHTML=`
     <div class="page active">
       <h2>Resources 📚</h2>
-      <p class="lead">Shared links for the camp. Anyone can suggest one — ${isTeacher()?"you approve student suggestions before they go live.":"your teachers approve student suggestions before they appear here."}</p>
-      <div class="sec-title">Week 1 · ML foundations</div>
-      <div id="res-week1"></div>
-      <div class="sec-title">Week 2 · Going deeper</div>
-      <div id="res-week2"></div>
-      ${isTeacher()?`<div class="sec-title">⏳ Pending review</div><div id="res-pending"></div>`:""}
+      <p class="lead">Class resources powered by Supabase. Add links, notes, or uploaded files under Prayan's app space.</p>
+      <div class="sec-title">Prayan · GenWise Camp</div>
+      <div id="res-own"><div class="empty">Loading resources…</div></div>
+      <div class="sec-title">All class resources</div>
+      <div id="res-class"><div class="empty">Loading resources…</div></div>
       <div class="card" style="margin-top:18px;">
-        <div class="sec-title" style="margin-top:0;">Suggest a resource</div>
+        <div class="sec-title" style="margin-top:0;">Add a resource</div>
         <div class="field"><input id="r-title" placeholder="Title"></div>
-        <div class="field"><input id="r-url" placeholder="https://…  (or attach a file below)"></div>
-        <div class="field"><input id="r-note" placeholder="Short note (optional)"></div>
-        <div class="field"><input id="r-file" type="file"><div class="small muted" style="margin-top:4px;">Optional — attach a file instead of (or as well as) a link. Max 600&nbsp;KB.</div></div>
+        <div class="field"><input id="r-url" placeholder="https://…  (optional if adding text or a file)"></div>
+        <div class="field"><textarea id="r-note" rows="3" placeholder="Description or text note"></textarea></div>
+        <div class="field"><input id="r-file" type="file"><div class="small muted" style="margin-top:4px;">Optional — attach a file to upload to Supabase Storage.</div></div>
         <div class="row">
           <select id="r-cat" style="max-width:200px;"><option value="week1">Week 1 (ML foundations)</option><option value="week2">Week 2 (Going deeper)</option></select>
-          <button class="btn" id="r-add">${isTeacher()?"Add link":"Suggest"}</button>
+          <button class="btn" id="r-add">Add resource</button>
         </div>
-        ${isTeacher()?"":'<div class="small muted" style="margin-top:8px;">Your suggestion is sent to your teachers for approval. 👍</div>'}
       </div>
     </div>`;
-  // seed once if empty — push each item so they're stored as keyed maps (arrays drop pushed keys in JSON)
-  sub(roomBase+"/resources", v=>{
-    if(v==null){ ["week1","week2"].forEach(cat=> SEED_RESOURCES[cat].forEach(item=> DB.push(roomBase+"/resources/"+cat, item))); return; }
-    paintRes("week1", v.week1); paintRes("week2", v.week2);
-  });
-  if(isTeacher()) sub(roomBase+"/pending", v=>paintPending(v));
+
+  const refresh = async ()=>{
+    try{
+      const list = await loadSupabaseResources();
+      paintRes("own", list.filter(r=>r.appSlug===APP_SLUG));
+      paintRes("class", list.filter(r=>r.appSlug!==APP_SLUG));
+    }catch(e){
+      $("#res-own").innerHTML = `<div class="empty">Couldn't load Supabase resources: ${esc(e.message||e)}</div>`;
+      $("#res-class").innerHTML = "";
+    }
+  };
+  refresh();
 
   $("#r-add").onclick=async ()=>{
     const title=$("#r-title").value.trim(), url=$("#r-url").value.trim(), note=$("#r-note").value.trim(), cat=$("#r-cat").value;
     const fileInput=$("#r-file"); const file=fileInput&&fileInput.files[0];
     if(!title) return toast("Need a title");
-    if(!url && !file) return toast("Add a URL or attach a file");
+    if(!url && !file && !note) return toast("Add a URL, text, or file");
     const btn=$("#r-add"); btn.disabled=true;
     let fileObj=null;
     if(file){
-      const MAX=600*1024;
-      if(file.size>MAX){ btn.disabled=false; return toast("File too big — max 600 KB"); }
-      try{ const data=await readAsDataURL(file); fileObj={name:file.name, type:file.type||"", size:file.size, data}; }
-      catch(e){ btn.disabled=false; return toast("Couldn't read that file"); }
+      try{
+        toast("Uploading file to Supabase…");
+        fileObj = await uploadResourceFile(file);
+      }
+      catch(e){
+        btn.disabled=false;
+        return toast("Upload failed: "+(e.message||"check Supabase access"));
+      }
     }
-    const item={title,url,note}; if(fileObj) item.file=fileObj;
-    if(isTeacher()){
-      DB.push(roomBase+"/resources/"+cat, item);
-      toast("Resource added");
-    } else {
-      DB.push(roomBase+"/pending", {...item,cat,by:me.uid,byName:me.name,t:DB.now()});
-      toast("Sent to teachers for approval ✅");
+    try{
+      await saveSupabaseResource({ title, url, note, cat, fileObj });
+      toast("Resource saved to Supabase ✅");
+      await refresh();
+    }catch(e){
+      toast("Save failed: "+(e.message||"check Supabase access"));
     }
     $("#r-title").value=$("#r-url").value=$("#r-note").value=""; if(fileInput) fileInput.value="";
     btn.disabled=false;
   };
 }
-function paintPending(v){
-  const host=$("#res-pending"); if(!host) return;
-  const list=toMap(v).sort((a,b)=>(a.t||0)-(b.t||0));
-  if(!list.length){ host.innerHTML='<div class="empty">No suggestions waiting.</div>'; return; }
-  host.innerHTML="";
-  list.forEach(p=>{
-    const el=document.createElement("div"); el.className="item"; el.style.borderLeft="4px solid var(--brand)";
-    el.innerHTML=`<div class="row"><div>
-        <div class="t"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)} ↗</a></div>
-        <div class="d">${esc(p.note||p.url||"")}${p.file?` · 📎 ${esc(p.file.name||"file")}`:""}</div>
-        <div class="small muted" style="margin-top:3px;">Suggested by ${esc(p.byName||"a student")} · ${p.cat==="week2"?"Week 2":"Week 1"}</div></div>
-        <div class="right" style="display:flex;gap:6px;">
-          <button class="btn small" data-ok="${p._k}">Approve</button>
-          <button class="btn ghost small" data-no="${p._k}">Reject</button></div></div>`;
-    el.querySelector("[data-ok]").onclick=()=>{
-      const item={title:p.title,url:p.url,note:p.note}; if(p.file) item.file=p.file;
-      DB.push(roomBase+"/resources/"+(p.cat||"week1"), item);
-      DB.remove(roomBase+"/pending/"+p._k); toast("Approved & published");
-    };
-    el.querySelector("[data-no]").onclick=()=>{ DB.remove(roomBase+"/pending/"+p._k); toast("Rejected"); };
-    host.appendChild(el);
-  });
-}
 function paintRes(cat, data){
   const host=$("#res-"+cat); if(!host) return;
-  // data may be seeded array or pushed object map
-  const list = Array.isArray(data)? data.map((d,i)=>({_k:String(i),...d})) : toMap(data);
-  if(!list.length){ host.innerHTML='<div class="empty">No links yet.</div>'; return; }
+  const list = Array.isArray(data)? data : toMap(data);
+  if(!list.length){ host.innerHTML='<div class="empty">No resources yet.</div>'; return; }
   host.innerHTML="";
   list.forEach(r=>{
     const el=document.createElement("div"); el.className="item";
-    const hasFile = r.file && r.file.data;
-    const titleHref = r.url ? esc(r.url) : (hasFile ? r.file.data : "#");
-    const titleAttrs = r.url ? 'target="_blank" rel="noopener"' : (hasFile ? `download="${esc(r.file.name||"file")}"` : "");
-    const fileLine = hasFile ? `<div class="d">📎 <a href="${r.file.data}" download="${esc(r.file.name||"file")}">${esc(r.file.name||"Download file")}</a> <span class="small muted">(${fmtSize(r.file.size)})</span></div>` : "";
+    const hasFile = r.file && (r.file.path || r.file.data);
+    const title = r.url || hasFile
+      ? `<a href="${r.url ? esc(r.url) : "#"}" ${r.url ? 'target="_blank" rel="noopener"' : 'data-file-main="1"'}>${esc(r.title)} ↗</a>`
+      : `<span>${esc(r.title)}</span>`;
+    const fileLine = hasFile ? `<div class="d">📎 <a href="#" data-file-link="1">${esc(r.file.name||"Download file")}</a> <span class="small muted">(${fmtSize(r.file.size)})</span></div>` : "";
+    const tagLine = `<div class="small muted" style="margin-top:3px;">${esc(r.author||"Unknown")} · ${esc(r.appSlug||APP_SLUG)}${r.createdAt?" · "+fmtTime(r.createdAt):""}</div>`;
     el.innerHTML=`<div class="row"><div>
-        <div class="t"><a href="${titleHref}" ${titleAttrs}>${esc(r.title)} ↗</a></div>
+        <div class="t">${title}</div>
         ${r.note?`<div class="d">${esc(r.note)}</div>`:(r.url?`<div class="d">${esc(r.url)}</div>`:"")}
-        ${fileLine}</div>
-        ${isTeacher()&&!Array.isArray(data)?`<button class="btn ghost small right" data-k="${r._k}">Remove</button>`:""}
+        ${fileLine}
+        ${tagLine}</div>
       </div>`;
-    const rm=el.querySelector("button");
-    if(rm) rm.onclick=()=>DB.remove(roomBase+"/resources/"+cat+"/"+rm.dataset.k);
+    el.querySelectorAll("[data-file-link],[data-file-main]").forEach(a=>{
+      a.onclick = async (ev)=>{
+        ev.preventDefault();
+        await attachFileDownload(a, r.file);
+        if(a.href && a.href!=="#") window.open(a.href, "_blank", "noopener");
+      };
+    });
     host.appendChild(el);
   });
 }
