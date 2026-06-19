@@ -339,8 +339,10 @@ async function getSupabaseClient(){
   banner.id = "sb-banner";
   banner.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:99999;padding:11px 16px;"
     + "font:600 13px/1.45 system-ui,-apple-system,sans-serif;text-align:center;color:#fff;"
-    + "background:#6b7280;box-shadow:0 -2px 12px #0004;";
-  const show = (msg,bg)=>{ banner.innerHTML = msg; banner.style.background = bg; };
+    + "background:#6b7280;box-shadow:0 -2px 12px #0004;transition:opacity .5s ease,transform .5s ease;";
+  const show = (msg,bg)=>{ banner.innerHTML = msg; banner.style.background = bg; banner.style.opacity = "1"; banner.style.transform = "none"; };
+  const autoHide = (delay=4000)=>{ setTimeout(()=>{ banner.style.opacity = "0"; banner.style.transform = "translateY(100%)";
+    setTimeout(()=>banner.remove(), 600); }, delay); };
   const mount = ()=>{ if(!document.getElementById("sb-banner") && document.body) document.body.appendChild(banner); };
   if(document.body) mount(); else document.addEventListener("DOMContentLoaded", mount);
 
@@ -361,6 +363,7 @@ async function getSupabaseClient(){
     show(`✅ Connected to Supabase! <b>${rows?.length||0}</b> resource row(s), `
        + `<b>${files?.length||0}</b> file(s) in <b>${SUPABASE_BUCKET}/${APP_SLUG}</b>.`, "#15803d");
     console.log(`[Supabase] ✅ Connected — resources table + "${SUPABASE_BUCKET}/${APP_SLUG}" storage folder are ready.`);
+    autoHide();   // success: fade the banner out after a few seconds (errors stay visible)
   }catch(e){
     show(`❌ Supabase connection failed: ${e.message||e}. `
        + `Check the URL, anon key, bucket name, and that the bucket allows access (policies).`, "#b91c1c");
@@ -430,6 +433,8 @@ const SEATS = [
   {id:"s5", label:"Sohum",   emoji:"🦁", role:"student"},
   {id:"s6", label:"Kiyaan",  emoji:"🐬", role:"student"},
   {id:"s7", label:"Leysha",  emoji:"🦄", role:"student"},
+  {id:"s8", label:"Vihaan",  emoji:"🐯", role:"student"},
+  {id:"s9", label:"Kannan",  emoji:"🐨", role:"student"},
 ];
 const AVATARS = ["🦊","🐼","🦉","🐧","🦁","🐬","🦄","🐯","🐨","🐸","🦅","🐙","🦝","🐳","🦋","🐝"];
 const LS_ID = "genwise_identity_v1";
