@@ -751,11 +751,20 @@ function renderResources(){
       </div>
     </div>`;
 
+  // Hide test rows & other apps' internal records from the shared class list.
+  const isJunkResource = (r)=>{
+    const t = (r.title||"").toLowerCase();
+    const n = (r.note||"").toLowerCase();
+    if(/codex delete check|preview test app|temporary delete verification/.test(t+" "+n)) return true;
+    // path-like titles (e.g. "…/classrooms/…/folders/general") are another app's DB rows, not real resources
+    if(/\/(classrooms|folders|members)\//.test(r.title||"")) return true;
+    return false;
+  };
   const refresh = async ()=>{
     try{
       const list = await loadSupabaseResources();
       paintRes("own", list.filter(r=>r.appSlug===APP_SLUG));
-      paintRes("class", list.filter(r=>r.appSlug!==APP_SLUG));
+      paintRes("class", list.filter(r=>r.appSlug!==APP_SLUG && !isJunkResource(r)));
     }catch(e){
       $("#res-own").innerHTML = `<div class="empty">Couldn't load Supabase resources: ${esc(e.message||e)}</div>`;
       $("#res-class").innerHTML = "";
