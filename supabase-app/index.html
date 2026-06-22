@@ -568,6 +568,17 @@ async function downloadResourceFile(file){
   try{ await triggerDownload(await getResourceFileUrl(file, true), file?.name); }
   catch(e){ toast("Couldn't download that file"); }
 }
+// Teacher-only: delete a resource row and its uploaded storage file (if any).
+let resourcesRefresh = ()=>{};
+async function deleteSupabaseResource(r){
+  const supabase = await getSupabaseClient();
+  if(r.file?.path){
+    const { error: fErr } = await supabase.storage.from(r.file.bucket||SUPABASE_BUCKET).remove([r.file.path]);
+    if(fErr) throw fErr;
+  }
+  const { error } = await supabase.from("resources").delete().eq("id", r._k);
+  if(error) throw error;
+}
 function resourceFromSupabaseRow(row){
   return {
     _k: row.id,
@@ -702,8 +713,10 @@ function renderChat(){
       const el=document.createElement("div");
       el.className="msg"+(mine?" me":"")+(m.role==="teacher"?" teacher":"");
       el.innerHTML=`<div class="pa">${esc(m.avatar||"🙂")}</div>
-        <div><div class="meta"><b>${esc(m.name)}</b> · ${fmtTime(m.t)}</div>
+        <div><div class="meta"><b>${esc(m.name)}</b> · ${fmtTime(m.t)}${isTeacher()?` · <a href="#" data-del-msg="${m._k}" class="muted" style="text-decoration:none;" title="Delete message">🗑️</a>`:""}</div>
         <div class="bubble">${esc(m.text)}</div></div>`;
+      const dm=el.querySelector("[data-del-msg]");
+      if(dm) dm.onclick=(ev)=>{ ev.preventDefault(); if(confirm("Delete this message?")) DB.remove(roomBase+"/messages/"+dm.dataset.delMsg); };
       box.appendChild(el);
     });
     box.scrollTop=box.scrollHeight;
@@ -805,6 +818,7 @@ function renderResources(){
       $("#res-transcripts").innerHTML = `<div class="empty">Couldn't load transcripts: ${esc(e.message||e)}</div>`;
     }
   };
+  resourcesRefresh = refresh;   // let teacher delete buttons re-load the list
   refresh();
 
   $("#r-add").onclick=async ()=>{
@@ -853,10 +867,18 @@ function paintRes(cat, data){
         ${r.note?`<div class="d">${esc(r.note)}</div>`:(r.url?`<div class="d">${esc(r.url)}</div>`:"")}
         ${fileLine}
         ${tagLine}</div>
+        ${isTeacher()?`<button class="btn ghost small right" data-del-res="1">Delete</button>`:""}
       </div>`;
     el.querySelectorAll("[data-file-link],[data-file-main]").forEach(a=>{
       a.onclick = (ev)=>{ ev.preventDefault(); downloadResourceFile(r.file); };
     });
+    const delBtn=el.querySelector("[data-del-res]");
+    if(delBtn) delBtn.onclick=async ()=>{
+      if(!confirm(`Delete "${r.title}"${r.file?.path?" and its uploaded file":""}? This can't be undone.`)) return;
+      delBtn.disabled=true;
+      try{ await deleteSupabaseResource(r); toast("Resource deleted"); await resourcesRefresh(); }
+      catch(e){ delBtn.disabled=false; toast("Delete failed: "+(e.message||"check Supabase access")); }
+    };
     host.appendChild(el);
   });
 }
