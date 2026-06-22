@@ -734,6 +734,8 @@ function renderResources(){
     <div class="page active">
       <h2>Resources 📚</h2>
       <p class="lead">Class resources powered by Supabase. Add links, notes, or uploaded files under Prayan's app space.</p>
+      <div class="sec-title">📋 Class Transcripts · from Sir</div>
+      <div id="res-transcripts"><div class="empty">Loading transcripts…</div></div>
       <div class="sec-title">Prayan · GenWise Camp</div>
       <div id="res-own"><div class="empty">Loading resources…</div></div>
       <div class="sec-title">All class resources</div>
@@ -760,14 +762,42 @@ function renderResources(){
     if(/\/(classrooms|folders|members)\//.test(r.title||"")) return true;
     return false;
   };
+  const loadTranscripts = async ()=>{
+    const supabase = await getSupabaseClient();
+    const { data, error } = await supabase.storage.from(SUPABASE_BUCKET).list("class_transcripts", { limit: 100, sortBy:{ column:"name", order:"asc" } });
+    if(error) throw error;
+    return (data||[]).filter(f=>f.id); // id=null means it's a sub-folder, not a file
+  };
+  const paintTranscripts = (files)=>{
+    const host = $("#res-transcripts"); if(!host) return;
+    if(!files.length){ host.innerHTML='<div class="empty">No transcripts uploaded yet.</div>'; return; }
+    host.innerHTML="";
+    files.forEach(f=>{
+      const supabase = window.supabase;
+      const publicUrl = supabase
+        ? supabase.storage.from(SUPABASE_BUCKET).getPublicUrl("class_transcripts/"+f.name).data.publicUrl
+        : "#";
+      const el=document.createElement("div"); el.className="item";
+      el.innerHTML=`<div class="row">
+        <div>
+          <div class="t"><a href="${esc(publicUrl)}" target="_blank" rel="noopener">📄 ${esc(f.name)} ↗</a></div>
+          <div class="small muted">${fmtSize(f.metadata?.size||0)} · uploaded ${fmtTime(f.updated_at)}</div>
+        </div>
+        <a href="${esc(publicUrl)}" download="${esc(f.name)}" class="btn ghost small right">Download</a>
+      </div>`;
+      host.appendChild(el);
+    });
+  };
   const refresh = async ()=>{
     try{
-      const list = await loadSupabaseResources();
+      const [list, transcripts] = await Promise.all([loadSupabaseResources(), loadTranscripts()]);
+      paintTranscripts(transcripts);
       paintRes("own", list.filter(r=>r.appSlug===APP_SLUG));
       paintRes("class", list.filter(r=>r.appSlug!==APP_SLUG && !isJunkResource(r)));
     }catch(e){
       $("#res-own").innerHTML = `<div class="empty">Couldn't load Supabase resources: ${esc(e.message||e)}</div>`;
       $("#res-class").innerHTML = "";
+      $("#res-transcripts").innerHTML = `<div class="empty">Couldn't load transcripts: ${esc(e.message||e)}</div>`;
     }
   };
   refresh();
