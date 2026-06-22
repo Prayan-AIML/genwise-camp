@@ -568,17 +568,12 @@ async function downloadResourceFile(file){
   try{ await triggerDownload(await getResourceFileUrl(file, true), file?.name); }
   catch(e){ toast("Couldn't download that file"); }
 }
-// Teacher-only: delete a resource row and its uploaded storage file (if any).
 let resourcesRefresh = ()=>{};
-async function deleteSupabaseResource(r){
-  const supabase = await getSupabaseClient();
-  if(r.file?.path){
-    const { error: fErr } = await supabase.storage.from(r.file.bucket||SUPABASE_BUCKET).remove([r.file.path]);
-    if(fErr) throw fErr;
-  }
-  const { error } = await supabase.from("resources").delete().eq("id", r._k);
-  if(error) throw error;
-}
+// Teacher "Delete" = hide from THIS app's view only. Supabase (table + storage) is NEVER touched.
+const HIDDEN_RES_KEY = "genwise_hidden_resources_v1";
+function getHiddenResources(){ try{ return new Set(JSON.parse(localStorage.getItem(HIDDEN_RES_KEY)||"[]")); }catch(e){ return new Set(); } }
+function hideResource(id){ const s=getHiddenResources(); s.add(id); localStorage.setItem(HIDDEN_RES_KEY, JSON.stringify([...s])); }
+function isHiddenResource(r){ return getHiddenResources().has(r._k); }
 function resourceFromSupabaseRow(row){
   return {
     _k: row.id,
@@ -810,8 +805,9 @@ function renderResources(){
     try{
       const [list, transcripts] = await Promise.all([loadSupabaseResources(), loadTranscripts()]);
       paintTranscripts(transcripts);
-      paintRes("own", list.filter(r=>r.appSlug===APP_SLUG));
-      paintRes("class", list.filter(r=>r.appSlug!==APP_SLUG && !isJunkResource(r)));
+      const visible = list.filter(r=>!isHiddenResource(r));
+      paintRes("own", visible.filter(r=>r.appSlug===APP_SLUG));
+      paintRes("class", visible.filter(r=>r.appSlug!==APP_SLUG && !isJunkResource(r)));
     }catch(e){
       $("#res-own").innerHTML = `<div class="empty">Couldn't load Supabase resources: ${esc(e.message||e)}</div>`;
       $("#res-class").innerHTML = "";
@@ -874,10 +870,8 @@ function paintRes(cat, data){
     });
     const delBtn=el.querySelector("[data-del-res]");
     if(delBtn) delBtn.onclick=async ()=>{
-      if(!confirm(`Delete "${r.title}"${r.file?.path?" and its uploaded file":""}? This can't be undone.`)) return;
-      delBtn.disabled=true;
-      try{ await deleteSupabaseResource(r); toast("Resource deleted"); await resourcesRefresh(); }
-      catch(e){ delBtn.disabled=false; toast("Delete failed: "+(e.message||"check Supabase access")); }
+      if(!confirm(`Remove "${r.title}" from this app? It stays safe in Supabase — only hidden here.`)) return;
+      hideResource(r._k); toast("Removed from app (Supabase unchanged)"); await resourcesRefresh();
     };
     host.appendChild(el);
   });
