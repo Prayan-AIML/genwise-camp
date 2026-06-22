@@ -568,6 +568,17 @@ async function downloadResourceFile(file){
   try{ await triggerDownload(await getResourceFileUrl(file, true), file?.name); }
   catch(e){ toast("Couldn't download that file"); }
 }
+// Fetch a remote file (e.g. a raw GitHub URL) and save it directly, instead of opening inline.
+async function downloadRawFile(rawUrl, filename){
+  try{
+    const res = await fetch(rawUrl);
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    await triggerDownload(url, filename);
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  }catch(e){ toast("Couldn't download "+(filename||"file")); }
+}
 let resourcesRefresh = ()=>{};
 // Teacher "Delete" = hide from THIS app's view only. Supabase (table + storage) is NEVER touched.
 const HIDDEN_RES_KEY = "genwise_hidden_resources_v1";
@@ -738,7 +749,8 @@ const BUILTIN_RESOURCES = [
     note: "Think WITH your AI before you build — shape an idea through structured back-and-forth. Jazz partner, not jukebox. Repo has a README.md + a detailed SKILL.md.",
     author: "Mr. Ashish",
     appSlug: "class-shared",
-    builtin: true
+    builtin: true,
+    downloadRaw: { url: "https://raw.githubusercontent.com/ashishefe/letschataboutit/main/SKILL.md", name: "SKILL.md" }
   }
 ];
 const SEED_RESOURCES = {
@@ -873,17 +885,21 @@ function paintRes(cat, data){
       ? `<a href="${r.url ? esc(r.url) : "#"}" ${r.url ? 'target="_blank" rel="noopener"' : 'data-file-main="1"'}>${esc(r.title)} ↗</a>`
       : `<span>${esc(r.title)}</span>`;
     const fileLine = hasFile ? `<div class="d">📎 <a href="#" data-file-link="1">${esc(r.file.name||"Download file")}</a> <span class="small muted">(${fmtSize(r.file.size)})</span></div>` : "";
+    const rawLine = r.downloadRaw ? `<div class="d">📎 <a href="#" data-raw-link="1">Download ${esc(r.downloadRaw.name)}</a></div>` : "";
     const tagLine = `<div class="small muted" style="margin-top:3px;">${esc(r.author||"Unknown")} · ${esc(r.appSlug||APP_SLUG)}${r.createdAt?" · "+fmtTime(r.createdAt):""}</div>`;
     el.innerHTML=`<div class="row"><div>
         <div class="t">${title}</div>
         ${r.note?`<div class="d">${esc(r.note)}</div>`:(r.url?`<div class="d">${esc(r.url)}</div>`:"")}
         ${fileLine}
+        ${rawLine}
         ${tagLine}</div>
         ${isTeacher()?`<button class="btn ghost small right" data-del-res="1">Delete</button>`:""}
       </div>`;
     el.querySelectorAll("[data-file-link],[data-file-main]").forEach(a=>{
       a.onclick = (ev)=>{ ev.preventDefault(); downloadResourceFile(r.file); };
     });
+    const rawA=el.querySelector("[data-raw-link]");
+    if(rawA) rawA.onclick=(ev)=>{ ev.preventDefault(); toast("Downloading "+r.downloadRaw.name+"…"); downloadRawFile(r.downloadRaw.url, r.downloadRaw.name); };
     const delBtn=el.querySelector("[data-del-res]");
     if(delBtn) delBtn.onclick=async ()=>{
       if(!confirm(`Remove "${r.title}" from this app? It stays safe in Supabase — only hidden here.`)) return;
