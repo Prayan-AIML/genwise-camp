@@ -549,21 +549,24 @@ async function uploadResourceFile(file){
   if(error) throw error;
   return { name:file.name, type:file.type||"", size:file.size, bucket:SUPABASE_BUCKET, path };
 }
-async function getResourceFileUrl(file){
+async function getResourceFileUrl(file, asDownload){
   if(file?.data) return file.data; // supports old local test files if any exist
   if(!file?.path) return "#";
   const supabase = await getSupabaseClient();
-  return supabase.storage.from(file.bucket||SUPABASE_BUCKET).getPublicUrl(file.path).data.publicUrl;
+  // download:<name> makes Supabase send Content-Disposition: attachment → real save, not inline view
+  const opts = asDownload ? { download: file.name || true } : undefined;
+  return supabase.storage.from(file.bucket||SUPABASE_BUCKET).getPublicUrl(file.path, opts).data.publicUrl;
 }
-async function attachFileDownload(link, file){
-  try{
-    link.href = await getResourceFileUrl(file);
-    link.target = "_blank";
-    link.rel = "noopener";
-  }catch(e){
-    link.href = "#";
-    link.onclick = (ev)=>{ ev.preventDefault(); toast("Couldn't open that file"); };
-  }
+// Trigger an actual file download (works cross-origin because the URL forces an attachment).
+async function triggerDownload(url, filename){
+  if(!url || url==="#") { toast("File not available"); return; }
+  const a=document.createElement("a");
+  a.href=url; a.download=filename||"download"; a.rel="noopener";
+  document.body.appendChild(a); a.click(); a.remove();
+}
+async function downloadResourceFile(file){
+  try{ await triggerDownload(await getResourceFileUrl(file, true), file?.name); }
+  catch(e){ toast("Couldn't download that file"); }
 }
 function resourceFromSupabaseRow(row){
   return {
@@ -774,17 +777,19 @@ function renderResources(){
     host.innerHTML="";
     files.forEach(f=>{
       const supabase = window.supabase;
-      const publicUrl = supabase
-        ? supabase.storage.from(SUPABASE_BUCKET).getPublicUrl("class_transcripts/"+f.name).data.publicUrl
-        : "#";
+      const path = "class_transcripts/"+f.name;
+      const viewUrl = supabase ? supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(path).data.publicUrl : "#";
+      // download:<name> → Content-Disposition: attachment, so it saves instead of opening inline
+      const dlUrl = supabase ? supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(path, { download: f.name }).data.publicUrl : "#";
       const el=document.createElement("div"); el.className="item";
       el.innerHTML=`<div class="row">
         <div>
-          <div class="t"><a href="${esc(publicUrl)}" target="_blank" rel="noopener">📄 ${esc(f.name)} ↗</a></div>
+          <div class="t"><a href="${esc(viewUrl)}" target="_blank" rel="noopener">📄 ${esc(f.name)} ↗</a></div>
           <div class="small muted">${fmtSize(f.metadata?.size||0)} · uploaded ${fmtTime(f.updated_at)}</div>
         </div>
-        <a href="${esc(publicUrl)}" download="${esc(f.name)}" class="btn ghost small right">Download</a>
+        <button class="btn ghost small right" data-dl="1">Download</button>
       </div>`;
+      el.querySelector("[data-dl]").onclick = ()=> triggerDownload(dlUrl, f.name);
       host.appendChild(el);
     });
   };
@@ -850,11 +855,7 @@ function paintRes(cat, data){
         ${tagLine}</div>
       </div>`;
     el.querySelectorAll("[data-file-link],[data-file-main]").forEach(a=>{
-      a.onclick = async (ev)=>{
-        ev.preventDefault();
-        await attachFileDownload(a, r.file);
-        if(a.href && a.href!=="#") window.open(a.href, "_blank", "noopener");
-      };
+      a.onclick = (ev)=>{ ev.preventDefault(); downloadResourceFile(r.file); };
     });
     host.appendChild(el);
   });
