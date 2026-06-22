@@ -771,6 +771,8 @@ function renderResources(){
     if(/codex delete check|preview test app|temporary delete verification/.test(t+" "+n)) return true;
     // path-like titles (e.g. "…/classrooms/…/folders/general") are another app's DB rows, not real resources
     if(/\/(classrooms|folders|members)\//.test(r.title||"")) return true;
+    // transcripts have their own section above — don't duplicate them in the class list
+    if((r.file?.path||"").startsWith("class_transcripts/")) return true;
     return false;
   };
   const loadTranscripts = async ()=>{
