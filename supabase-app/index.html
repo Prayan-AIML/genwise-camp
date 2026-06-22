@@ -728,6 +728,19 @@ function renderChat(){
 /* ============================================================
    PAGE: RESOURCES
    ============================================================ */
+// Built-in resources baked into THIS app — shown to everyone who opens it,
+// with NO Supabase row. Appears in the "All class resources" section.
+const BUILTIN_RESOURCES = [
+  {
+    _k: "builtin-letschataboutit",
+    title: "letschataboutit — AI thinking skill (Mr. Ashish)",
+    url: "https://github.com/ashishefe/letschataboutit",
+    note: "Think WITH your AI before you build — shape an idea through structured back-and-forth. Jazz partner, not jukebox. Repo has a README.md + a detailed SKILL.md.",
+    author: "Mr. Ashish",
+    appSlug: "class-shared",
+    builtin: true
+  }
+];
 const SEED_RESOURCES = {
   week1: [
     {title:"Google — Machine Learning Crash Course", url:"https://developers.google.com/machine-learning/crash-course", note:"Hands-on intro to ML fundamentals."},
@@ -808,8 +821,9 @@ function renderResources(){
       const [list, transcripts] = await Promise.all([loadSupabaseResources(), loadTranscripts()]);
       paintTranscripts(transcripts);
       const visible = list.filter(r=>!isHiddenResource(r));
+      const builtins = BUILTIN_RESOURCES.filter(r=>!isHiddenResource(r));
       paintRes("own", visible.filter(r=>r.appSlug===APP_SLUG));
-      paintRes("class", visible.filter(r=>r.appSlug!==APP_SLUG && !isJunkResource(r)));
+      paintRes("class", [...builtins, ...visible.filter(r=>r.appSlug!==APP_SLUG && !isJunkResource(r))]);
     }catch(e){
       $("#res-own").innerHTML = `<div class="empty">Couldn't load Supabase resources: ${esc(e.message||e)}</div>`;
       $("#res-class").innerHTML = "";
