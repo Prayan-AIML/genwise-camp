@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My GenWise AI/ML Journey — Prayan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg0:#070912; --bg1:#0d1124; --bg2:#141a38;
+    --ink:#eef1fb; --muted:#9aa3c8; --faint:#646c93;
+    --cyan:#22d3ee; --violet:#8b5cf6; --pink:#f472b6;
+    --green:#34d399; --amber:#fbbf24; --blue:#60a5fa;
+    --line:rgba(255,255,255,.09);
+    --card:rgba(255,255,255,.035);
+    --card2:rgba(255,255,255,.06);
+    --grad:linear-gradient(120deg,#22d3ee 0%,#8b5cf6 52%,#f472b6 100%);
+    --display:'Space Grotesk',system-ui,sans-serif;
+    --body:'Inter',system-ui,-apple-system,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden}
+  body{font-family:var(--body);color:var(--ink);background:var(--bg0);-webkit-font-smoothing:antialiased}
+
+  .bg{position:fixed;inset:0;z-index:0;background:
+    radial-gradient(1100px 700px at 12% -8%, rgba(34,211,238,.16), transparent 60%),
+    radial-gradient(1000px 800px at 92% 8%, rgba(139,92,246,.18), transparent 60%),
+    radial-gradient(900px 700px at 50% 120%, rgba(244,114,182,.14), transparent 60%),
+    linear-gradient(180deg,var(--bg0),var(--bg1))}
+  .bg::after{content:"";position:absolute;inset:0;opacity:.5;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:46px 46px;mask:radial-gradient(circle at 50% 35%,#000 0%,transparent 72%)}
+
+  .progress{position:fixed;top:0;left:0;height:3px;z-index:60;background:var(--grad);width:0;transition:width .5s cubic-bezier(.2,.7,.2,1);box-shadow:0 0 16px rgba(139,92,246,.6)}
+
+  /* deck */
+  .deck{position:relative;z-index:10;height:100%}
+  .slide{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    padding:52px 56px 188px;opacity:0;visibility:hidden;transform:translateY(20px) scale(.99);
+    transition:opacity .5s ease,transform .55s cubic-bezier(.2,.7,.2,1),visibility .5s}
+  .slide.active{opacity:1;visibility:visible;transform:none}
+  .inner{width:100%;max-width:1120px}
+
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .65s cubic-bezier(.2,.7,.2,1);
+    transition-delay:calc(var(--d,0)*85ms)}
+  .slide.active .reveal{opacity:1;transform:none}
+
+  .eyebrow{font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--cyan);display:inline-flex;align-items:center;gap:10px;margin-bottom:18px}
+  .eyebrow::before{content:"";width:26px;height:2px;background:var(--grad);border-radius:2px}
+  h1{font-family:var(--display);font-weight:700;font-size:clamp(2.6rem,6vw,4.4rem);line-height:1.03;letter-spacing:-.02em}
+  h2{font-family:var(--display);font-weight:700;font-size:clamp(1.8rem,4vw,2.8rem);line-height:1.08;letter-spacing:-.015em}
+  .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lead{color:var(--muted);font-size:clamp(1rem,1.45vw,1.22rem);line-height:1.55;max-width:54ch}
+  .accent{color:var(--ink);font-weight:600}
+
+  .grid{display:grid;gap:15px}.g2{grid-template-columns:repeat(2,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .mt8{margin-top:8px}.mt16{margin-top:16px}.mt24{margin-top:24px}.mt28{margin-top:28px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;backdrop-filter:blur(6px);position:relative;overflow:hidden}
+  .card .ic{font-size:23px;display:block;margin-bottom:10px}
+  .card h3{font-family:var(--display);font-size:16px;font-weight:600;margin-bottom:7px}
+  .card p{color:var(--muted);font-size:13px;line-height:1.5}
+  .card .tag{font-family:var(--display);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:9px}
+  .card.glow::before{content:"";position:absolute;top:-40%;right:-30%;width:150px;height:150px;border-radius:50%;background:var(--grad);filter:blur(60px);opacity:.16}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font-size:12.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card2);color:var(--ink)}
+  .chip b{color:var(--cyan);font-weight:600}
+
+  .badge{display:inline-flex;align-items:center;gap:9px;padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:var(--card2);font-size:13px;color:var(--muted);backdrop-filter:blur(8px)}
+  .titlewrap{text-align:center}
+  .meta{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;margin-top:28px}
+  .meta .m{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .meta .m b{font-family:var(--display);font-size:21px;font-weight:700}
+  .meta .m span{color:var(--faint);font-size:11.5px;letter-spacing:.05em}
+  .sep{width:1px;background:var(--line)}
+
+  /* flow / stages */
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .node{flex:1;min-width:120px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:13px 10px;text-align:center}
+  .node .ic{font-size:21px}.node .t{font-family:var(--display);font-weight:600;font-size:13px;margin-top:6px}
+  .node .s{color:var(--muted);font-size:11.5px;margin-top:4px;line-height:1.35}
+  .arrowx{display:flex;align-items:center;color:var(--violet);font-size:18px;padding:0 5px}
+  .stages{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .stage{display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:72px}
+  .stage .e{font-size:22px}.stage .n{font-size:11px;color:var(--muted);font-family:var(--display)}
+  .stagearr{color:var(--faint);font-size:14px}
+
+  /* bars */
+  .bars{display:grid;gap:13px}
+  .bar{display:grid;grid-template-columns:150px 1fr 78px;align-items:center;gap:14px}
+  .bar .lbl{font-family:var(--display);font-size:13px;font-weight:600;text-align:right;color:var(--ink)}
+  .bar .track{height:28px;border-radius:9px;background:rgba(255,255,255,.05);overflow:hidden;border:1px solid var(--line)}
+  .bar .fill{height:100%;width:0;border-radius:8px;transition:width 1s cubic-bezier(.2,.7,.2,1);transition-delay:.3s}
+  .slide.active .bar .fill{width:var(--w)}
+  .bar .val{font-family:var(--display);font-weight:700;font-size:15px;color:var(--ink)}
+  .bar.awaiting .track{border-style:dashed}
+  .bar .fill.striped{background-image:repeating-linear-gradient(45deg,rgba(251,191,36,.55) 0 10px,rgba(251,191,36,.25) 10px 20px)}
+
+  .note{border-left:2px solid var(--violet);padding:5px 0 5px 14px;color:var(--muted);font-size:13.5px;line-height:1.5}
+  .hint{color:var(--faint);font-size:12.5px;letter-spacing:.03em}
+  .kbd{font-family:var(--display);border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:11px;color:var(--muted);background:var(--card2)}
+
+  /* ---------- NARRATION TOUR ---------- */
+  .stage-dock{position:fixed;left:0;right:0;bottom:0;z-index:50;
+    background:linear-gradient(180deg,transparent,rgba(7,9,18,.72) 38%,rgba(7,9,18,.95));
+    padding:26px 24px 16px}
+  .narrate{max-width:880px;margin:0 auto;display:flex;gap:14px;align-items:flex-start}
+  .speaker{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:19px;
+    background:var(--card2);border:1px solid var(--line);box-shadow:0 0 0 0 rgba(139,92,246,.5)}
+  .speaker.talking{animation:pulse 1.6s ease-out infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(139,92,246,.45)}100%{box-shadow:0 0 0 14px rgba(139,92,246,0)}}
+  .bubble{flex:1}
+  .who{font-family:var(--display);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--violet);margin-bottom:4px}
+  #narration{font-size:clamp(15px,1.6vw,18.5px);line-height:1.62;color:#eaeefb;min-height:1.6em}
+  #narration .w{display:inline-block;opacity:0;animation:wordIn .45s forwards}
+  @keyframes wordIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+
+  .timebar{max-width:880px;margin:13px auto 0;height:3px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+  .timebar > i{display:block;height:100%;width:0;background:var(--grad);border-radius:3px}
+
+  .controls{max-width:880px;margin:12px auto 0;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .controls .left{display:flex;align-items:center;gap:8px}
+  .btn{height:36px;min-width:36px;padding:0 11px;border-radius:9px;border:1px solid var(--line);background:var(--card2);
+    color:var(--ink);font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.18s;backdrop-filter:blur(8px);font-family:var(--body)}
+  .btn:hover{border-color:rgba(255,255,255,.32);background:rgba(255,255,255,.12);transform:translateY(-1px)}
+  .btn.play{background:var(--grad);border:none;color:#0b0b16;font-weight:700;padding:0 16px}
+  .controls .meta-r{display:flex;align-items:center;gap:14px;color:var(--faint);font-size:12px}
+  .counter{font-family:var(--display);font-variant-numeric:tabular-nums}
+  .brandmini{display:flex;align-items:center;gap:8px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--grad);box-shadow:0 0 10px var(--violet)}
+
+  @media(max-width:900px){
+    .slide{padding:46px 22px 210px}
+    .g2,.g4{grid-template-columns:1fr 1fr}
+    .flow{gap:7px}.arrowx{transform:rotate(90deg)}
+    .bar{grid-template-columns:104px 1fr 56px;gap:9px}
+  }
+  @media(max-width:600px){.g4{grid-template-columns:1fr 1fr}.controls .meta-r{display:none}}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="progress" id="progress"></div>
+
+<div class="deck" id="deck">
+
+  <!-- 1 — TITLE -->
+  <section class="slide">
+    <div class="inner titlewrap">
+      <div class="reveal" style="--d:0"><span class="badge">🎓 GenWise A.I. / M.L. Summer Camp · June 2026</span></div>
+      <h1 class="reveal mt24" style="--d:1">My <span class="grad">A.I.</span> Journey</h1>
+      <p class="lead reveal mt16" style="--d:2;margin-inline:auto">A 2-minute tour of what I learned — and the two real apps I built:
+        <span class="accent">Mumble</span> &amp; the <span class="accent">Ludo A.I. test</span>.</p>
+      <div class="meta reveal mt28" style="--d:3">
+        <div class="m"><b>Prayan</b><span>STUDENT</span></div>
+        <div class="sep"></div>
+        <div class="m"><b>1 week</b><span>OF CAMP</span></div>
+        <div class="sep"></div>
+        <div class="m"><b>2 apps</b><span>I BUILT</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 — WHAT I LEARNED -->
+  <section class="slide">
+    <div class="inner">
+      <span class="eyebrow reveal" style="--d:0">What the camp taught me</span>
+      <h2 class="reveal" style="--d:1">Four things — and I <span class="grad">built</span> with each one</h2>
+      <div class="grid g4 mt28">
+        <div class="card glow reveal" style="--d:2"><span class="ic">🧠</span><h3>How A.I. thinks</h3><p>How it reads, remembers and forgets — and what it costs to build.</p></div>
+        <div class="card glow reveal" style="--d:3"><span class="ic">🛠️</span><h3>Giving A.I. tools</h3><p>How a chatbot gets real "hands" to actually do things, not just talk.</p></div>
+        <div class="card glow reveal" style="--d:4"><span class="ic">🚀</span><h3>Building real apps</h3><p>Databases, logins and putting an app online for anyone to use.</p></div>
+        <div class="card glow reveal" style="--d:5"><span class="ic">📊</span><h3>Testing A.I.</h3><p>How do we actually <i>know</i> one A.I. is smarter than another?</p></div>
+      </div>
+      <p class="note reveal mt24" style="--d:6">We never just listened — every idea turned straight into something we made. My two projects are where it all came together. 👇</p>
+    </div>
+  </section>
+
+  <!-- 3 — MUMBLE -->
+  <section class="slide">
+    <div class="inner">
+      <span class="eyebrow reveal" style="--d:0">Project 1 · for young children</span>
+      <h2 class="reveal" style="--d:1">🐉 <span class="grad">Mumble</span> — a buddy that learns to speak <i>with</i> you</h2>
+      <div class="grid g2 mt24" style="grid-template-columns:1.05fr .95fr">
+        <div class="reveal" style="--d:2">
+          <p class="lead">A speech-practice app for kids with speech delays. The child talks, a gentle A.I. coach replies out loud, and a little creature <span class="accent">grows as they practise</span> — so the child is the teacher, never the patient.</p>
+          <div class="row mt16">
+            <span class="chip">🌱 <b>Grows</b> when you speak</span>
+            <span class="chip">🎯 Real-world <b>quests</b></span>
+            <span class="chip">💗 <b>Senses</b> frustration</span>
+          </div>
+        </div>
+        <div class="reveal" style="--d:3">
+          <div class="card">
+            <div class="tag">The creature grows through 5 stages</div>
+            <div class="stages mt8">
+              <div class="stage"><span class="e">🥚</span><span class="n">Egg</span></div><span class="stagearr">→</span>
+              <div class="stage"><span class="e">🐣</span><span class="n">Hatch</span></div><span class="stagearr">→</span>
+              <div class="stage"><span class="e">🐤</span><span class="n">Grow</span></div><span class="stagearr">→</span>
+              <div class="stage"><span class="e">🐲</span><span class="n">Full</span></div>
+            </div>
+            <div class="tag mt16">How a turn works</div>
+            <div class="flow mt8">
+              <div class="node"><span class="ic">🎤</span><div class="t">Child speaks</div></div>
+              <div class="arrowx">→</div>
+              <div class="node"><span class="ic">🧠</span><div class="t">A.I. coaches</div></div>
+              <div class="arrowx">→</div>
+              <div class="node"><span class="ic">🔊</span><div class="t">Speaks back</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note reveal mt16" style="--d:4">Built with everything from camp — A.I. voice + coach, a database that remembers progress, and it ships as a real <b style="color:var(--ink)">Mac, Windows &amp; Linux</b> app.</p>
+    </div>
+  </section>
+
+  <!-- 4 — LUDO WHAT/HOW -->
+  <section class="slide">
+    <div class="inner">
+      <span class="eyebrow reveal" style="--d:0">Project 2 · a science experiment</span>
+      <h2 class="reveal" style="--d:1">🎲 Which A.I. plays Ludo the <span class="grad">smartest</span>?</h2>
+      <div class="grid g2 mt24">
+        <div class="reveal" style="--d:2">
+          <p class="lead">Ludo is mostly <span class="accent">luck</span> — so "who wins" just measures the dice. Instead, I gave several A.I.s the <span class="accent">exact same board</span> and scored how good each one's <i>move</i> was, compared to an expert. That measures real thinking, not lucky rolls.</p>
+        </div>
+        <div class="reveal" style="--d:3">
+          <div class="card"><div class="tag">How each move is judged</div>
+            <div class="flow mt8">
+              <div class="node"><span class="ic">🎯</span><div class="t">Same board</div></div>
+              <div class="arrowx">→</div>
+              <div class="node"><span class="ic">🤖</span><div class="t">A.I. picks a move</div></div>
+              <div class="arrowx">→</div>
+              <div class="node" style="border-color:rgba(52,211,153,.4)"><span class="ic">⚖️</span><div class="t">Compared to an expert</div></div>
+            </div>
+            <p class="note mt16">Several A.I.s tested fairly side-by-side — OpenAI, Google &amp; Anthropic — on identical positions.</p>
+          </div>
+        </div>
+      </div>
+      <p class="hint reveal mt16" style="--d:4">Live &amp; playable: <span class="accent">prayan-aiml.github.io/ludo-king-ai</span></p>
+    </div>
+  </section>
+
+  <!-- 5 — LUDO RESULTS -->
+  <section class="slide">
+    <div class="inner">
+      <span class="eyebrow reveal" style="--d:0">The result</span>
+      <h2 class="reveal" style="--d:1">A real <span class="grad">scoreboard</span> for A.I. thinking</h2>
+      <p class="lead reveal mt8" style="--d:2">Higher = smarter moves. Blind guessing ≈ 50, a perfect player = 100.</p>
+      <div class="bars mt24 reveal" style="--d:3">
+        <div class="bar"><div class="lbl">Blind guess</div><div class="track"><div class="fill" style="--w:50.7%;background:#9aa3b2"></div></div><div class="val">50.7</div></div>
+        <div class="bar"><div class="lbl">GPT-5.4 nano</div><div class="track"><div class="fill" style="--w:69.2%;background:linear-gradient(90deg,#3d8bd4,#60a5fa)"></div></div><div class="val">69.2</div></div>
+        <div class="bar"><div class="lbl">Gemini 2.5 Flash</div><div class="track"><div class="fill" style="--w:69.2%;background:linear-gradient(90deg,#6c5ce7,#8b5cf6)"></div></div><div class="val">69.2</div></div>
+        <div class="bar awaiting"><div class="lbl">Claude Opus 4.8</div><div class="track"><div class="fill striped" style="--w:30%"></div></div><div class="val" style="color:var(--amber);font-size:12px">to test</div></div>
+        <div class="bar"><div class="lbl">Perfect player</div><div class="track"><div class="fill" style="--w:100%;background:linear-gradient(90deg,#34d399,#34b27b)"></div></div><div class="val">100</div></div>
+      </div>
+      <p class="note reveal mt24" style="--d:4">The real A.I.s landed around <b style="color:var(--ink)">69</b> — clearly thinking about the board, but far from perfect. The point isn't the number, it's that I could <span class="grad">measure it.</span></p>
+    </div>
+  </section>
+
+  <!-- 6 — BOTH TOGETHER -->
+  <section class="slide">
+    <div class="inner titlewrap">
+      <span class="eyebrow reveal" style="--d:0;justify-content:center">Putting it together</span>
+      <h2 class="reveal" style="--d:1">One app <span class="grad">builds</span> with A.I.  ·  one <span class="grad">measures</span> it</h2>
+      <div class="grid g2 mt28" style="text-align:left">
+        <div class="card reveal" style="--d:2;border-color:rgba(139,92,246,.35)"><span class="ic">🐉</span><h3>Mumble — to create</h3><p>Uses A.I. to make something genuinely helpful for a child.</p></div>
+        <div class="card reveal" style="--d:3;border-color:rgba(34,211,238,.35)"><span class="ic">🎲</span><h3>Ludo test — to measure</h3><p>Judges how good A.I. really is, with a fair scoreboard.</p></div>
+      </div>
+      <p class="lead reveal mt28" style="--d:4;margin-inline:auto">Together that's the whole loop the camp taught me — <span class="grad">build it, then prove it works.</span></p>
+    </div>
+  </section>
+
+  <!-- 7 — CLOSING -->
+  <section class="slide">
+    <div class="inner titlewrap">
+      <h2 class="reveal" style="--d:0">Thanks for <span class="grad">watching</span> 🙏</h2>
+      <p class="lead reveal mt16" style="--d:1;margin-inline:auto">Both apps are real and online. Built in one week at the GenWise A.I. camp.</p>
+      <div class="row reveal mt28" style="--d:2;justify-content:center">
+        <span class="chip">🐉 github.com/Prayan-AIML/mumble</span>
+        <span class="chip">🎲 github.com/Prayan-AIML/ludo-king-ai</span>
+      </div>
+      <p class="hint reveal mt28" style="--d:3">— Prayan · GenWise A.I./M.L. · June 2026</p>
+    </div>
+  </section>
+
+</div>
+
+<!-- narration dock -->
+<div class="stage-dock">
+  <div class="narrate">
+    <div class="speaker" id="speaker">🧒</div>
+    <div class="bubble">
+      <div class="who">Prayan explains</div>
+      <div id="narration"></div>
+    </div>
+  </div>
+  <div class="timebar"><i id="timefill"></i></div>
+  <div class="controls">
+    <div class="left">
+      <button class="btn" id="prev" aria-label="Previous">←</button>
+      <button class="btn play" id="play" aria-label="Play or pause">▶ Play tour</button>
+      <button class="btn" id="next" aria-label="Next">→</button>
+    </div>
+    <div class="meta-r">
+      <span class="brandmini"><span class="dot"></span> GenWise · Prayan</span>
+      <span class="counter"><span id="cur">1</span> / <span id="tot">7</span></span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const slides=[...document.querySelectorAll('.slide')];
+  const total=slides.length;
+  const prog=document.getElementById('progress');
+  const cur=document.getElementById('cur');
+  const narration=document.getElementById('narration');
+  const timefill=document.getElementById('timefill');
+  const playBtn=document.getElementById('play');
+  const speaker=document.getElementById('speaker');
+  document.getElementById('tot').textContent=total;
+
+  // plain-language narration, one per slide
+  const NOTES=[
+    "Hi, I'm Prayan. Here's a quick two-minute tour of what I learned at the GenWise A.I. camp, and the two real apps I built. It plays on its own, so just sit back and watch.",
+    "Over one week I learned four big things: how A.I. actually thinks, how it can use tools to get real work done, how to build a proper app with its own database, and how to test whether an A.I. is any good. We built something with every single idea.",
+    "My first app is Mumble. It's a friendly creature that helps young children practise speaking. The child talks, an A.I. gently coaches back out loud, and the creature grows as they practise. It even senses when a child is upset and makes things easier, so they always finish on a win.",
+    "My second project is a little science experiment. Ludo is mostly luck, so instead of asking who wins, I gave several A.I.s the exact same board and scored how smart each one's move was, compared to an expert player. That measures real thinking, not lucky dice.",
+    "Here are the results. A blind guesser scores about fifty, and a perfect player a hundred. The real A.I.s landed around sixty-nine, so they are clearly thinking about the board, but still far from perfect. The exciting part is that I could actually measure it.",
+    "So one project uses A.I. to build something genuinely helpful, and the other measures how good A.I. really is. Together, that's the whole loop the camp taught me. Build something, then prove that it works.",
+    "Thanks so much for watching. Both apps are real and online, and I built them in just one week. — Prayan."
+  ];
+
+  let i=0, playing=false, timer=null;
+
+  function dur(n){ const words=NOTES[n].split(/\s+/).length; return Math.min(26000, Math.max(8500, words*360+3500)); }
+
+  function renderNote(n){
+    const words=NOTES[n].split(/\s+/);
+    narration.innerHTML=words.map((w,k)=>`<span class="w" style="animation-delay:${Math.min(k*60,3200)}ms">${w}</span>`).join(' ');
+  }
+
+  function runTimebar(ms){
+    timefill.style.transition='none'; timefill.style.width='0%';
+    void timefill.offsetWidth;
+    timefill.style.transition='width '+ms+'ms linear'; timefill.style.width='100%';
+  }
+  function clearTimebar(){ timefill.style.transition='none'; timefill.style.width='0%'; }
+
+  function schedule(){
+    clearTimeout(timer);
+    if(!playing) return;
+    const ms=dur(i);
+    runTimebar(ms);
+    timer=setTimeout(()=>{ if(i<total-1) show(i+1); else stop(true); }, ms);
+  }
+
+  function show(n){
+    i=Math.max(0,Math.min(total-1,n));
+    slides.forEach((s,k)=>s.classList.toggle('active',k===i));
+    prog.style.width=(i/(total-1)*100)+'%';
+    cur.textContent=i+1;
+    renderNote(i);
+    history.replaceState(null,'','#'+(i+1));
+    if(playing) schedule(); else clearTimebar();
+  }
+
+  function play(){
+    if(i>=total-1) i=-1, void show(0); // replay from start if at end
+    playing=true; speaker.classList.add('talking');
+    playBtn.innerHTML='⏸ Pause';
+    if(i<0) i=0;
+    schedule();
+  }
+  function stop(ended){
+    playing=false; speaker.classList.remove('talking');
+    playBtn.innerHTML = ended ? '↻ Replay' : '▶ Play tour';
+    clearTimeout(timer); clearTimebar();
+  }
+  function toggle(){ playing ? stop(false) : play(); }
+
+  playBtn.onclick=toggle;
+  document.getElementById('next').onclick=()=>show(i+1);
+  document.getElementById('prev').onclick=()=>show(i-1);
+
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'){e.preventDefault();show(i+1);}
+    else if(e.key==='ArrowLeft'){e.preventDefault();show(i-1);}
+    else if(e.key===' '){e.preventDefault();toggle();}
+    else if(e.key==='Home'){show(0);}
+    else if(e.key==='End'){stop(false);show(total-1);}
+    else if(e.key==='f'||e.key==='F'){ document.fullscreenElement?document.exitFullscreen?.():document.documentElement.requestFullscreen?.(); }
+  });
+
+  // touch swipe
+  let x0=null;
+  addEventListener('touchstart',e=>x0=e.touches[0].clientX,{passive:true});
+  addEventListener('touchend',e=>{ if(x0===null)return; const dx=e.changedTouches[0].clientX-x0; if(Math.abs(dx)>50){dx<0?show(i+1):show(i-1);} x0=null; },{passive:true});
+
+  // boot: show first slide, then auto-start the tour shortly after
+  show(0);
+  setTimeout(play, 900);
+</script>
+</body>
+</html>
